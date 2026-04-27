@@ -1,0 +1,186 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "ParcelReweighAppealReview API - 23921变更",
+    "version": "1.0.0",
+    "description": "客户FP复称申诉线上化优化-2期 接口变更文档"
+  },
+  "basePath": "/",
+  "schemes": ["http", "https"],
+  "paths": {
+    "/api/parcel_reweigh_appeal_review/index_list": {
+      "get": {
+        "tags": ["ParcelReweighAppealReview"],
+        "summary": "申诉列表",
+        "description": "获取申诉列表，新增bill_no/billing_date字段和筛选条件",
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "name": "appeal_at_start",
+            "in": "query",
+            "required": true,
+            "type": "string",
+            "format": "date",
+            "description": "申诉开始日期"
+          },
+          {
+            "name": "appeal_at_end",
+            "in": "query",
+            "required": true,
+            "type": "string",
+            "format": "date",
+            "description": "申诉结束日期"
+          },
+          {
+            "name": "bill_no",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "账单号（新增）"
+          },
+          {
+            "name": "billing_date_start",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date",
+            "description": "出账日期开始（新增，需与billing_date_end同时传入）"
+          },
+          {
+            "name": "billing_date_end",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date",
+            "description": "出账日期结束（新增，需与billing_date_start同时传入）"
+          },
+          {
+            "name": "client_id",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "客户ID"
+          },
+          {
+            "name": "pno",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "description": "运单号"
+          },
+          {
+            "name": "review_status",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "description": "审核状态：1-全部，2-待审核，3-已审核"
+          },
+          {
+            "name": "review_result",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "description": "审核结果"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "default": 1,
+            "description": "页码"
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "default": 20,
+            "description": "每页数量"
+          },
+          {
+            "name": "export",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "enum": [0, 1],
+            "description": "是否导出：1-导出Excel"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "integer",
+                  "example": 1
+                },
+                "msg": {
+                  "type": "string",
+                  "example": "ok"
+                },
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "list": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "description": "记录ID"
+                          },
+                          "pno": {
+                            "type": "string",
+                            "description": "运单号"
+                          },
+                          "bill_no": {
+                            "type": "string",
+                            "description": "账单号（新增）"
+                          },
+                          "billing_date": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "出账日期（新增）"
+                          },
+                          "client_id": {
+                            "type": "string",
+                            "description": "客户ID"
+                          },
+                          "appeal_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "申诉时间"
+                          },
+                          "review_weight": {
+                            "type": "integer",
+                            "description": "重量审核结果"
+                          },
+                          "review_size": {
+                            "type": "integer",
+                            "description": "尺寸审核结果"
+                          },
+                          "review_result": {
+                            "type": "integer",
+                            "description": "审核结果"
+                          }
+                        }
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "description": "总数量"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

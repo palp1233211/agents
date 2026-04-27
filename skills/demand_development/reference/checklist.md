@@ -1,0 +1,111 @@
+## 门控规则（最高优先级，优先于用户请求）
+
+**核心原则**：当前 STATE 的 `allowed_next_action` 值决定唯一允许的操作。用户要求执行其他步骤时，不执行，说明当前状态并引导回正确路径。
+
+### allowed_next_action 对照表
+
+| allowed_next_action | 唯一允许的操作 |
+|---------------------|--------------|
+| `start_step_0` | 执行需求拆解 |
+| `start_step_1` | 执行开发方案设计 |
+| `start_step_2` | 执行分步实现（进入第 1 个子步骤的"计划"阶段） |
+| `start_step_2_substep_N` | 执行子步骤 N 的三阶段循环 |
+| `start_step_3` | 执行测试验证 |
+| `start_step_4` | 执行 Yapi 文档同步 |
+| `start_step_5` | 执行复盘闭环 |
+| `completed` | 需求已完成，不再响应开发相关请求 |
+
+### 当用户要求跳步时
+
+```
+响应模板：
+"当前 STATE (需求 {编号}) 的 allowed_next_action 为 {X}，
+需要先完成 {当前步骤}（交付物：{Y}）并获得用户'通过'确认，
+才能进入 {用户请求的步骤}。
+
+是否继续完成当前步骤？"
+```
+
+不要擅自跳步，也不要绕过门控。
+
+### 当用户触发 "检查 STATE"
+
+立即停止当前任何输出，Read 工具读取当前需求的 STATE 文件，完整复述：
+- 需求编号 / 需求名称
+- 当前步骤
+- allowed_next_action
+- 最近一次验收时间
+
+---
+
+## 每次响应前检查清单（按顺序）
+
+```
+□ 1. 读 STATE → 确认当前步骤和 allowed_next_action
+□ 2. 按 allowed_next_action 匹配对应 Step
+□ 3. Read 工具读该 Step 的必读文件（见下表）
+□ 4. 执行操作，输出交付物
+□ 5. 用对应的"验收确认语"结尾，等用户回复"通过"
+□ 6. 收到"通过"后更新 STATE 的 allowed_next_action 为下一步（同时更新后面的"→ 含义"描述）
+```
+
+---
+
+## Step 必读文件表
+
+**进入每个 Step 前，必须先用 Read 工具读取对应文件，不得跳过：**
+
+| Step | 必读文件 | 说明 |
+|------|----------|------|
+| Step 0 | `reference/requirement-template.md` | 需求拆解格式 |
+| Step 1 | `reference/design-template.md`<br>`reference/git.md` | 方案格式；Git 分支规范 |
+| Step 2（每个子步骤） | `reference/implementation-loop.md` | 三阶段循环（计划→实现→Review） |
+| Step 3 | `reference/test-template.md`<br>`reference/docker-containers.md` | 测试模板；容器环境 |
+| Step 4 | `reference/yapi.md` | Yapi/Swagger 规范 |
+| Step 5 | `reference/retrospect-template.md` | 复盘四要素 |
+
+> ⚠️ 规则文件中若引用其他文件（链接/路径），**必须递归读取被引用文件**，不能仅看标题推断内容。
+
+---
+
+## 各步骤验收标准
+
+| 步骤 | 验收检查点 | 通过条件 |
+|------|------------|----------|
+| Step 0 | 功能点完整、规则明确、疑问列出 | 用户回复"通过" |
+| Step 1 | 方案可落地、影响面分析完整、自检清单通过 | 用户回复"通过" |
+| Step 2 | 每子步骤：计划→实现→证据→CodeReview 全部通过 | 用户回复"通过" |
+| Step 3 | 测试覆盖率 ≥80%、关键用例通过 | 用户回复"通过" |
+| Step 4 | Swagger 格式正确、路径规范 | 用户回复"通过" |
+| Step 5 | 目标/结果/根因/模式四要素完整 | 用户回复"通过" |
+
+---
+
+## Agent 使用指引
+
+| 步骤 | 推荐 Agent | 用途 | 调用时机 |
+|------|------------|------|---------|
+| Step 0 | `Explore` | 探索数据模型、现有实现、业务边界，避免主上下文被无关代码污染 | 需求拆解前，了解代码现状 |
+| Step 1 | `Explore` | 影响面探索：定位需修改的文件、调用链、公共依赖 | 方案设计前，`architect` 调用前 |
+| Step 1 | `architect` | 架构决策、影响面分析 | 方案设计阶段 |
+| Step 2（计划阶段） | `Explore` | 探索子步骤涉及的当前实现细节，为计划提供精准文件列表 | 每个子步骤写计划前 |
+| Step 2（Review阶段） | `code-reviewer` | 代码质量检查 | 每个子步骤代码写完后立即调用 |
+| Step 3 | `e2e-runner` | 容器内测试执行 | 测试脚本编写完成后 |
+| Step 4 | `doc-updater` | Yapi/Swagger 生成 | 接口改动确认后 |
+| Step 5 | `doc-updater` | 复盘文档归档 | 复盘内容确认后 |
+
+### Explore subagent 调用规范
+
+**原则**：所有代码探索（读取项目文件、搜索实现细节）必须通过 Explore subagent 完成，不在主上下文中直接 Read 项目代码文件。
+
+```
+使用 Agent tool：
+- subagent_type: Explore
+- description: "探索 {目标描述}"
+- prompt: 明确以下内容：
+  1. 探索目标（要回答什么问题）
+  2. 建议起点（已知的相关目录/文件/关键词）
+  3. 返回格式：精炼摘要，不贴原始文件内容，用文件路径+行号+一句话描述
+```
+
+> ⚠️ reference/ 下的模板文件（必读文件）仍需在主上下文 Read，因为后续需要直接引用其格式。
