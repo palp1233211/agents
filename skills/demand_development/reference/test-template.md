@@ -2,9 +2,22 @@
 
 > 根据 Step 0 功能点和 Step 1 接口设计制定测试方案
 
+### 章节地图
+
+| 分组 | 章节 |
+|------|------|
+| 前置 | 3.0.1 选型 / 3.0.2 Docker |
+| 脚手架 | 3.1 类型 / 3.2 目录 / 3.3 bootstrap / 3.4 国家配置 |
+| 编写测试 | 3.5 文件模板 / 3.7 FAQ / 3.8 数据管理 |
+| 防伪三件套 | **3.9 对照实验 / 3.10 主动构造 / 3.12 空结果防伪** |
+| 专项 | 3.11 ETL 备份还原 |
+| 执行验收 | 3.6 执行命令 / **3.13 自检中心** |
+
+> 新写测试**必读**：3.5（模板）→ 3.9 + 3.10 + 3.12（三件套）→ 3.13（提交前自检）。
+
 ---
 
-## 测试方案选型说明
+## 3.0.1 测试方案选型说明
 
 本项目使用**手写测试类**（非 PHPUnit），原因：
 
@@ -16,7 +29,7 @@
 
 ---
 
-## ⚠️ 前置条件：Docker 环境
+## 3.0.2 前置条件：Docker 环境 ⚠️
 
 **所有测试必须在 Docker 容器中执行，本机环境不可用。**
 
@@ -41,8 +54,8 @@ docker exec {container} cat /mnt/www/.env | grep country_code
 
 | 类型 | 覆盖范围 | 框架 |
 |------|----------|------|
-| 单元测试 | 核心业务逻辑、数据转换、校验函数 | PHPUnit / PHP CLI |
-| 集成测试 | API接口、数据库操作、外部服务调用 | PHPUnit / PHP CLI |
+| 单元测试 | 核心业务逻辑、数据转换、校验函数 | PHP CLI（手写测试类，见选型说明） |
+| 集成测试 | API接口、数据库操作、外部服务调用 | PHP CLI（手写测试类，见选型说明） |
 
 ### 覆盖目标
 - 最低覆盖率：**80%**
@@ -184,23 +197,27 @@ class YourBLLTest
 
     /**
      * TC-001: 测试方法
+     *
+     * 注意：本模板只示范结构，实际断言必须遵守 3.9 对照实验 + 3.12 空结果防伪规则，
+     *       禁止使用 !empty / count > 0 这类弱断言作为最终验证。
      */
     public function testYourMethod()
     {
         echo "\n=== TC-001: testYourMethod ===\n";
         echo "调用方法: YourBLL::yourMethod()\n";
 
-        // 准备测试数据
-        $testId = 1;
+        // 准备测试数据（$testId 推荐使用不冲突的特定 ID，详见 3.8）
+        $testId = 99999;
+        $params = ['id' => $testId];   // 按被测方法签名提供具体入参
         $this->db->execute("UPDATE your_table SET test_field = 'TEST_VALUE' WHERE id = {$testId}");
 
         try {
             // 调用实际方法（必须调用实际方法，禁止复制代码验证）
             $result = $this->bll->yourMethod($params);
 
-            // 验证返回值
-            $this->assert('返回值验证', !empty($result));
-            $this->assert('字段存在', isset($result['expected_field']));
+            // ✅ 用具体值断言，而不是 !empty / isset 这类弱断言
+            $this->assert('返回值结构正确', is_array($result));
+            $this->assert('expected_field == 期望值', ($result['expected_field'] ?? null) === 'EXPECTED_VALUE');
         } finally {
             // 清理测试数据
             $this->db->execute("UPDATE your_table SET test_field = '' WHERE id = {$testId}");
@@ -260,15 +277,17 @@ exit($success ? 0 : 1);
 # 进入容器
 docker exec -it {container} bash
 
-# 运行指定需求测试
-php /mnt/www/tests/Unit/23921/YourBLLTest.php
+# 运行指定需求的单个测试
+php /mnt/www/tests/Unit/{需求号}/YourBLLTest.php
 
-# 运行指定需求所有测试
-for f in /mnt/www/tests/Unit/23921/*Test.php; do php "$f"; done
+# 运行指定需求所有测试（任一失败即整体失败）
+fail=0; for f in /mnt/www/tests/Unit/{需求号}/*Test.php; do php "$f" || fail=1; done; exit $fail
 
 # 运行所有测试
-for f in /mnt/www/tests/Unit/*/*Test.php; do php "$f"; done
+fail=0; for f in /mnt/www/tests/Unit/*/*Test.php; do php "$f" || fail=1; done; exit $fail
 ```
+
+> 退出码：单个测试遵守 3.5 模板（失败 exit 1）。批量执行用 `|| fail=1` 聚合，否则循环只看最后一条退出码会漏报。
 
 > **注意**：Docker 容器已挂载整个项目目录，测试文件修改后直接生效，无需同步。
 
@@ -276,17 +295,9 @@ for f in /mnt/www/tests/Unit/*/*Test.php; do php "$f"; done
 
 ## 3.7 常见问题及解决方案
 
-### 问题 1：测试脚本位置不规范
+> 涉及"测试脚本位置"和"Phalcon 类找不到（bootstrap 加载顺序）"参见 3.2 和 3.3，本节不再重复。
 
-**错误做法**：测试脚本写到 `/tmp/` 临时目录
-
-**正确做法**：
-- 测试文件放入 `tests/Unit/` 目录
-- 引导文件放入 `tests/bootstrap.php`
-
----
-
-### 问题 2：复制代码而非调用实际方法
+### 问题 1：复制代码而非调用实际方法
 
 **错误做法**：
 ```php
@@ -300,12 +311,12 @@ $effective_weight = ($weight == 0) ? 1 : $weight;
 // ✅ 调用实际方法验证行为
 $bll = new YourBLL();
 $result = $bll->yourMethod($params);
-$this->assert('返回值验证', $result === $expected);
+$this->assert('返回值等于期望值', $result === $expected);
 ```
 
 ---
 
-### 问题 3：CLI 模式缺少 Web 环境变量
+### 问题 2：CLI 模式缺少 Web 环境变量
 
 **报错**：
 ```
@@ -322,7 +333,7 @@ $_SERVER['HTTP_HOST'] = $_SERVER['HTTP_HOST'] ?? 'localhost';
 
 ---
 
-### 问题 4：数据库连接指向错误环境
+### 问题 3：数据库连接指向错误环境
 
 **报错**：
 ```
@@ -331,29 +342,8 @@ Table 'wrong_db.your_table' doesn't exist
 
 **解决方案**：
 1. 确认当前国家配置：`cat .env | grep country_code`
-2. 切换到正确的国家配置：`cp .env.th .env`
+2. 切换到正确的国家配置：`cp env.th .env`
 3. 在 bootstrap.php 中按国家代码加载配置
-
----
-
-### 问题 5：Phalcon 类找不到
-
-**报错**：
-```
-Class 'FlashExpress\bi\App\Models\xxx' not found
-```
-
-**解决方案**：确保 bootstrap.php 按顺序加载：
-```php
-// 1. autoload.php
-require BASE_PATH . '/vendor/autoload.php';
-
-// 2. services.php（初始化 DI）
-include APP_PATH . '/config/services.php';
-
-// 3. loader.php（注册自动加载）
-include APP_PATH . '/config/loader.php';
-```
 
 ---
 
@@ -466,13 +456,7 @@ public function testExclusionRule()
 
 ### 自检：反向失败校验
 
-编写完测试后，做一次"破坏性自检"以确认测试**真的能发现 regression**：
-
-1. 临时注释掉 BLL 中的剔除判断
-2. 重跑此测试
-3. **实验组必须 FAIL**（对照组仍应 PASS）
-
-如果两组都还能通过，说明测试没有触达规则代码路径，必须重写。自检通过后再还原 BLL。
+> 自检清单已统一到 3.13，本节只需关注"注释规则代码 → 实验组必须 FAIL"这一项；写完所有测试后到 3.13 一并核对。
 
 ---
 
@@ -492,15 +476,15 @@ if (empty($record)) {
     return;
 }
 
-// ✅ 正确：找到可用记录，临时修改使其满足测试条件
-$record = $db->fetchOne("SELECT id FROM table WHERE ... LIMIT 1");
-// 临时将该记录改成需要测试的状态
+// ✅ 正确：找到可用记录，先取出原值，再临时修改，finally 还原
+$record = $db->fetchOne("SELECT id, field FROM table WHERE ... LIMIT 1");
+$origField = $record['field'];   // ⚠️ 必须先备份真实原值，禁止硬编码
 $db->execute("UPDATE table SET field = 'TEST_STATE' WHERE id = {$record['id']}");
 try {
     // 执行测试...
 } finally {
-    // 还原原始值
-    $db->execute("UPDATE table SET field = '{$record['original_value']}' WHERE id = {$record['id']}");
+    // 还原真实原值
+    $db->execute("UPDATE table SET field = ? WHERE id = ?", [$origField, $record['id']]);
 }
 ```
 
@@ -562,17 +546,119 @@ class EtlBLLTest
 
 ---
 
-## 3.12 验收输出结构
+## 3.12 空结果伪通过反模式（必须杜绝）
+
+### ⛔ 禁止：把"查不到数据 / 结果集为空"当作测试通过
+
+最常见的伪测试形态有三种，全部禁用：
+
+```php
+// ❌ 反模式 A：fetch 为空直接 PASS
+$rows = $this->db->fetchAll($sql);
+if (empty($rows)) {
+    echo "  [PASS] 无异常数据\n";   // 可能是规则生效，也可能 SQL 写错了
+    return;
+}
+
+// ❌ 反模式 B：断言"非法数据为空"，但样本本身可能为空
+$bad = array_filter($all, fn ($x) => $this->isInvalid($x));
+$this->assert('无非法数据', empty($bad));   // $all 为空时永远 PASS
+
+// ❌ 反模式 C：用 count == 0 断言"全部被剔除"，没确认基线数据存在
+$this->runBll();
+$this->assert('剔除生效', $this->getCount() === 0);   // 输入压根没有候选数据时也是 0
+```
+
+这三种写法都会让"数据没准备好 / SQL 写错 / 表结构改了"被错误地标记成通过，是最危险的 false-positive。
+
+### ✅ 强制规则
+
+**1. 任何"空 → 通过"分支必须改为"空 → FAIL 或主动构造"**
+
+```php
+$rows = $this->db->fetchAll($sql);
+if (empty($rows)) {
+    // 选项 1：算失败（数据是测试前提）
+    $this->assert('查询到候选数据', false);
+    return;
+
+    // 选项 2：按 3.10 主动构造满足条件的数据，再继续
+}
+```
+
+**2. 任何过滤/筛选类断言，必须先断言"样本非空"**
+
+```php
+$all = $this->db->fetchAll($sql);
+$this->assert('样本非空（前置条件）', count($all) > 0);
+
+$bad = array_filter($all, fn ($x) => $this->isInvalid($x));
+$this->assert('无非法数据', empty($bad));
+```
+
+**3. 任何 count/数量类断言必须有"基线 + 实验"两点，不能孤立断言 `count == 0`**
+
+参见 3.9 对照实验：必须先证明"对照组下目标记录被计入"，再证明"实验组下被剔除"。孤立的 `count === 0` 断言一律视为伪测试。
+
+**4. 写入型 BLL（ETL/聚合）测试，必须验证"实际写入行数 > 0 且包含目标记录"**
+
+```php
+$this->runBll();
+$written = $this->dbResult->fetchAll("SELECT * FROM result_table WHERE stat_month = ?", [$month]);
+$this->assert('结果表实际写入数据', count($written) > 0);
+$this->assert('目标记录在结果中', $this->containsTargetId($written, $targetId));
+```
+
+### 自检：空表反向校验
+
+> 自检清单统一到 3.13。本节关键原则：
+> - 临时把源表 WHERE 条件改成 `WHERE 1=0` 重跑测试，**必须 FAIL**
+> - 否则用例落入本节反模式之一，必须重写
+
+---
+
+## 3.13 验收输出结构（统一自检中心）
+
+> 3.9 / 3.10 / 3.12 散落的自检项**全部汇总在这里**，提交前必须逐项勾选。
 
 ```markdown
 ## 测试用例清单
 - 已编写用例：N 个
 - 覆盖功能点：[功能点列表]
+- 测试文件：[路径列表]
 
 ## 测试结果汇总
 | 用例数 | 通过 | 失败 | 通过率 |
 |--------|------|------|--------|
 | N | N | 0 | 100% |
+
+## 反伪通过自检（必填）
+
+### A. 用例编写规范（对应 3.5 / 3.7）
+- [ ] 调用实际方法验证（无复制代码片段自我验证）
+- [ ] 断言均为具体值/具体结构，无 `!empty` / `count > 0` 这类弱断言
+- [ ] 测试 ID 使用不冲突的特定值（如 99999），不污染真实数据
+
+### B. 数据管理（对应 3.8 / 3.10 / 3.11）
+- [ ] 测试数据准备 + 清理均在同一 try-finally 内
+- [ ] 数据不存在时主动构造或 FAIL，无 SKIP 分支
+- [ ] 修改记录前已 SELECT 真实原值备份，finally 还原真实值（无硬编码字面量）
+- [ ] ETL 类测试结果表已用 backupStats / restoreStats 备份还原
+
+### C. 对照实验（对应 3.9）
+- [ ] 每条规则均有 baseline + 对照组 + 实验组三段
+- [ ] 复合条件 (A AND B AND C) 已按单条件拆 TC
+- [ ] 边界值（>=  vs >）有独立 TC
+
+### D. 空结果防伪（对应 3.12）
+- [ ] 没有 `if (empty($rows)) { PASS; return; }` 分支
+- [ ] 所有"无 X"类断言前都有"样本非空"前置断言
+- [ ] 所有 `count === 0` 断言都配套"对照组 count > baseline"
+- [ ] 写入型 BLL 测试断言了"结果表实际有数据"且"包含目标记录"
+
+### E. 反向破坏性自检（最重要，写完必跑）
+- [ ] 注释规则代码 → 实验组 FAIL（证明用例真的触达规则）
+- [ ] 源表 `WHERE 1=0` → 用例 FAIL（证明空数据不会被误判通过）
 
 ## 验收结论
 ✅ 全部通过 / ❌ 存在失败用例
