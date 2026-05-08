@@ -70,8 +70,8 @@ docker exec {container} cat /mnt/www/.env | grep country_code
 
 | 类型 | 覆盖范围 | 框架 |
 |------|----------|------|
-| 单元测试 | 核心业务逻辑、数据转换、校验函数 | PHP CLI（手写测试类，见选型说明） |
-| 集成测试 | API接口、数据库操作、外部服务调用 | PHP CLI（手写测试类，见选型说明） |
+| 单元测试 | 核心业务逻辑、数据转换、校验函数 | PHPUnit 8.5 |
+| 集成测试 | API接口、数据库操作、外部服务调用 | PHPUnit 8.5 |
 
 ### 覆盖目标
 - 最低覆盖率：**80%**
@@ -161,6 +161,8 @@ Phalcon 项目按国家区分配置文件：
 | `env.ph` | 菲律宾环境配置 |
 | `env.my` | 马来西亚环境配置 |
 | `.env` | 当前生效配置 |
+
+> ⚠️ 国家配置不仅是 `country_code`，连同数据库地址、外部服务域名等都按文件整体切换，**必须 `cp` 整个文件**，禁止只改单个变量。
 
 ### 测试前必须确认
 
@@ -324,7 +326,7 @@ $effective_weight = ($weight == 0) ? 1 : $weight;
 // ✅ 调用实际方法验证行为
 $bll = new YourBLL();
 $result = $bll->yourMethod($params);
-$this->assert('返回值等于期望值', $result === $expected);
+$this->assertSame($expected, $result, '返回值等于期望值');
 ```
 
 ---
@@ -424,8 +426,12 @@ public function testMethod(): void
     $testId = 99999;  // 使用特定测试 ID
 
     // SELECT 原值备份
-    $orig = $this->db->fetchColumn("SELECT field FROM table WHERE id = ?", [$testId]);
-    $this->assertNotFalse($orig, '前置：目标记录存在');
+    $orig = $this->db->fetchOne(
+        "SELECT field FROM table WHERE id = ?",
+        \Phalcon\Db::FETCH_ASSOC,
+        [$testId]
+    );
+    $this->assertNotEmpty($orig, '前置：目标记录存在');
 
     $this->db->execute("UPDATE table SET field = ? WHERE id = ?", ['TEST_VALUE', $testId]);
 
@@ -434,7 +440,7 @@ public function testMethod(): void
         $this->assertSame('EXPECTED', $result);
     } finally {
         // 还原真实原值
-        $this->db->execute("UPDATE table SET field = ? WHERE id = ?", [$orig, $testId]);
+        $this->db->execute("UPDATE table SET field = ? WHERE id = ?", [$orig['field'], $testId]);
     }
 }
 ```
