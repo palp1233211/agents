@@ -13,6 +13,7 @@
 | `start_step_3` | 执行测试验证 |
 | `start_step_4` | 执行 Yapi 文档同步 |
 | `start_step_5` | 执行复盘闭环 |
+| `start_step_6` | 执行测试验收信息整理 |
 | `completed` | 需求已完成，不再响应开发相关请求 |
 
 ### 当用户要求跳步时
@@ -63,6 +64,7 @@
 | Step 3 | `reference/test-template.md`<br>`reference/docker-containers.md` | 测试模板；容器环境 |
 | Step 4 | `reference/yapi.md` | Yapi/Swagger 规范 |
 | Step 5 | `reference/retrospect-template.md` | 复盘四要素 |
+| Step 6 | `reference/qa-template.md` | 测试验收信息模板 |
 
 > ⚠️ 规则文件中若引用其他文件（链接/路径），**必须递归读取被引用文件**，不能仅看标题推断内容。
 
@@ -78,6 +80,7 @@
 | Step 3 | 测试覆盖率 ≥80%、关键用例通过、`workspace/docs/{需求号}-测试用例.md` 文件已落盘 | 用户回复"通过" |
 | Step 4 | Swagger 格式正确、路径规范 | 用户回复"通过" |
 | Step 5 | 目标/结果/根因/模式四要素完整 | 用户回复"通过" |
+| Step 6 | 测试验收信息完整（10个章节）、`workspace/docs/{需求号}-测试验收信息.md` 文件已落盘 | 用户回复"通过" |
 
 ---
 
